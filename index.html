@@ -317,11 +317,11 @@
     <div class="post-meta">A guide to how hierarchical navigable small worlds power modern vector databases</div>
   </header>
 
-  <p>To understand HNSW, imagine walking into a library with millions of books, looking for a specific book based on a brief description of the content. If the books were all piled up randomly, you'd have to check every book individually to find the one that matches your description best — that's brute force. While it would eventually work, it would take forever.</p>
+  <p>To understand HNSW, imagine walking into a library with millions of books, looking for a specific book based on a brief description of the content. If the books were all piled up randomly, you'd have to check every book individually to find the one that matches your description best, that's brute force. While it would eventually work, it would take forever.</p>
 
-  <p>But libraries aren't organized like that. They're structured to naturally guide you to the right section. You walk in and at the top level, you choose whether your book is in the fiction or nonfiction section. Then you narrow it down by genre — history, science, or biography. After that, you move to more specific subcategories or alphabetical order until you reach the exact shelf where your book is located.</p>
+  <p>But libraries aren't organized like that. They're structured to naturally guide you to the right section. You walk in and at the top level, you choose whether your book is in the fiction or nonfiction section. Then you narrow it down by genre history, science, or biography. After that, you move to more specific subcategories or alphabetical order until you reach the exact shelf where your book is located.</p>
 
-  <p>HNSW works the same way — and that intuition is worth holding onto as we go deeper.</p>
+  <p>HNSW works the same way and that intuition is worth holding onto as we go deeper.</p>
 
   <h2>HNSW Indexing</h2>
   <p><strong>HNSW (Hierarchical Navigable Small World)</strong> is a graph-based indexing algorithm used for Approximate Nearest Neighbor (ANN) search in high-dimensional vector spaces. Instead of comparing a query against every vector, HNSW organizes vectors into a hierarchical graph structure that enables fast navigation to the nearest neighbors.</p>
@@ -422,7 +422,7 @@
         <li>Explore nearby nodes within the most promising region</li>
         <li>Continue moving toward vectors that are increasingly similar to the query</li>
       </ul>
-      <p style="margin-top:0.9rem; margin-bottom:0; font-size:0.92rem; color:var(--ink-muted)">The algorithm reaches the nearest neighbor (or top-k nearest neighbors) — these are the final results.</p>
+      <p style="margin-top:0.9rem; margin-bottom:0; font-size:0.92rem; color:var(--ink-muted)">The algorithm reaches the nearest neighbor (or top-k nearest neighbors) and these are the final results.</p>
     </div>
   </div>
 
@@ -440,10 +440,10 @@
     <li>Fewer vectors reach Layer 1</li>
     <li>Very few vectors reach Layer 2 or higher</li>
   </ul>
-  <p>This randomness is intentional — it's what naturally keeps upper layers sparse and lower layers dense, maintaining the hierarchical structure that makes HNSW fast.</p>
+  <p>This randomness is intentional because it's what naturally keeps upper layers sparse and lower layers dense, maintaining the hierarchical structure that makes HNSW fast.</p>
 
   <h3>Step 2: Finding the Entry Point (Top Layers)</h3>
-  <p>Starting from the topmost layer of the graph, HNSW runs a greedy search — identical to the query search described earlier — moving toward nodes closest to the new vector. This phase has one goal: find the best entry point for the layer where insertion will actually happen. At each layer above the vector's assigned maximum, HNSW tracks only the single closest node and passes it down. No connections are formed yet.</p>
+  <p>Starting from the topmost layer of the graph, HNSW runs a greedy search, identical to the query search described earlier, moving toward nodes closest to the new vector. This phase has one goal: find the best entry point for the layer where insertion will actually happen. At each layer above the vector's assigned maximum, HNSW tracks only the single closest node and passes it down. No connections are formed yet.</p>
 
   <h3>Step 3: Selecting Neighbors (Insertion Layers)</h3>
   <p>Once HNSW reaches the vector's assigned maximum layer, the process changes. Instead of tracking just one candidate, it now tracks up to <code>ef_construct</code> candidates simultaneously. From these, HNSW selects the best <code>m</code> neighbors and creates bidirectional edges. This same process repeats going down through each layer until Layer 0.</p>
