@@ -333,6 +333,7 @@
     <div class="block-number">Building block 01</div>
     <h3>Navigable Small World (NSW)</h3>
     <p>A Navigable Small World is a type of network or graph that allows for efficient navigation and search through its nodes.</p>
+    <img src="images/Navigable Small World.png" alt="Navigable Small World diagram" style="width:100%; margin:1.5rem 0; border-radius:6px;">
 
     <h4>Structure</h4>
     <ul>
@@ -357,6 +358,7 @@
     <div class="block-number">Building block 02</div>
     <h3>Skip Lists</h3>
     <p>A Skip List is a data structure that allows fast search, insertion, and deletion operations. It is essentially a multi-level linked list where each level allows "skipping" over multiple elements, reducing the time complexity of operations.</p>
+    <img src="images/Skip Lists.png" alt="Skip List diagram" style="width:100%; margin:1.5rem 0; border-radius:6px;">
 
     <h4>How Skip Lists Work</h4>
     <ul>
@@ -380,7 +382,8 @@
 
   <h2>How Search Works in HNSW</h2>
   <p>The search process follows a top-down approach. Instead of starting with the full graph, the algorithm begins at the highest layer and gradually moves toward lower layers, refining its search at each step.</p>
-
+  <img src="images/HNSW diagram.png" alt="HNSW diagram" style="width:100%; margin:1.5rem 0; border-radius:6px;">
+  
   <div class="layer-grid">
     <div class="layer-card">
       <div class="layer-label">Layer 2 · Coarsest</div>
@@ -502,8 +505,9 @@
       </tr>
     </tbody>
   </table>
+  <img src="images/HNSW parameters.png" alt="HNSW paramters diagram" style="width:100%; margin:1.5rem 0; border-radius:6px;">
 
-  <h2>Why It Is Fast and Scalable</h2>
+  <h2>Why HNSW Is Fast and Scalable</h2>
 
   <h3>Sublinear Search Scaling</h3>
   <p>Unlike O(N) brute force search, HNSW search grows roughly logarithmically with the number of vectors. This makes million-scale datasets searchable in milliseconds rather than minutes.</p>
