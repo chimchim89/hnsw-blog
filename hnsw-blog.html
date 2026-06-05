@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understanding HNSW: The Engine Behind Fast Vector Search</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1a1a;
+    --ink-muted: #555;
+    --ink-faint: #888;
+    --bg: #faf9f7;
+    --surface: #f2f0ec;
+    --border: #e0ddd8;
+    --accent: #2d6a4f;
+    --accent-light: #e8f4f0;
+    --accent-rule: #52b788;
+    --tag-bg: #e9f5ee;
+    --tag-fg: #1e5e3e;
+    --serif: 'Lora', Georgia, serif;
+    --sans: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.75;
+    padding: 2rem 1rem 6rem;
+  }
+
+  article {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .post-header {
+    padding: 3rem 0 2.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3rem;
+  }
+
+  .post-tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tag-fg);
+    background: var(--tag-bg);
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 1.25rem;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(1.9rem, 5vw, 2.6rem);
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+  }
+
+  .post-meta {
+    font-size: 13.5px;
+    color: var(--ink-faint);
+    font-family: var(--sans);
+    font-weight: 300;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Body text ── */
+  p {
+    margin-bottom: 1.4rem;
+    color: var(--ink);
+    font-weight: 400;
+  }
+
+  /* ── Section headings ── */
+  h2 {
+    font-family: var(--serif);
+    font-size: 1.45rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 3rem 0 0.9rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent-rule);
+    display: inline-block;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 2rem 0 0.6rem;
+    letter-spacing: 0.01em;
+  }
+
+  h4 {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 1.5rem 0 0.4rem;
+  }
+
+  /* ── Numbered building-block cards ── */
+  .block-card {
+    background: var(--surface);
+    border-left: 3px solid var(--accent-rule);
+    border-radius: 0 8px 8px 0;
+    padding: 1.5rem 1.6rem;
+    margin: 2rem 0;
+  }
+
+  .block-card .block-number {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .block-card h3 {
+    margin: 0 0 0.9rem;
+    font-size: 1.1rem;
+  }
+
+  /* ── List styles ── */
+  ul, ol {
+    padding-left: 1.5rem;
+    margin-bottom: 1.2rem;
+  }
+
+  li {
+    margin-bottom: 0.45rem;
+  }
+
+  li::marker {
+    color: var(--accent-rule);
+  }
+
+  /* ── Layer steps ── */
+  .layer-grid {
+    display: grid;
+    gap: 1rem;
+    margin: 1.5rem 0 2rem;
+  }
+
+  .layer-card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1.4rem 1.6rem;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .layer-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent-rule);
+    opacity: 0.5;
+  }
+
+  .layer-card:first-child::before { opacity: 0.25; }
+  .layer-card:last-child::before { opacity: 1; }
+
+  .layer-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.35rem;
+  }
+
+  .layer-card h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+  }
+
+  .layer-card ul { margin-bottom: 0; }
+
+  /* ── Callout box ── */
+  .callout {
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 1.1rem 1.4rem;
+    margin: 1.8rem 0;
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+
+  .callout strong {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ── Param table ── */
+  .param-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0 2rem;
+    font-size: 0.92rem;
+  }
+
+  .param-table th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .param-table td {
+    padding: 0.85rem 0.75rem;
+    vertical-align: top;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.55;
+  }
+
+  .param-table tr:last-child td { border-bottom: none; }
+
+  .param-name {
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .param-range {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+
+  /* ── Scalability list ── */
+  .scale-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.2rem 0;
+  }
+
+  .scale-list li {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 0.7rem;
+  }
+
+  .scale-list li::before {
+    content: '→';
+    color: var(--accent-rule);
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* ── Closing ── */
+  .post-footer {
+    margin-top: 3.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.95rem;
+    color: var(--ink-muted);
+    font-style: italic;
+    font-family: var(--serif);
+    line-height: 1.7;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--surface);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+
+  hr.section-break {
+    border: none;
+    border-top: 1px dashed var(--border);
+    margin: 2.5rem 0;
+  }
+</style>
+</head>
+<body>
+<article>
+
+  <header class="post-header">
+    <div class="post-tag">Vector Search · Deep Dive</div>
+    <h1>Understanding HNSW: The Engine Behind Fast Vector Search</h1>
+    <div class="post-meta">A guide to how hierarchical navigable small worlds power modern vector databases</div>
+  </header>
+
+  <p>To understand HNSW, imagine walking into a library with millions of books, looking for a specific book based on a brief description of the content. If the books were all piled up randomly, you'd have to check every book individually to find the one that matches your description best — that's brute force. While it would eventually work, it would take forever.</p>
+
+  <p>But libraries aren't organized like that. They're structured to naturally guide you to the right section. You walk in and at the top level, you choose whether your book is in the fiction or nonfiction section. Then you narrow it down by genre — history, science, or biography. After that, you move to more specific subcategories or alphabetical order until you reach the exact shelf where your book is located.</p>
+
+  <p>HNSW works the same way — and that intuition is worth holding onto as we go deeper.</p>
+
+  <h2>HNSW Indexing</h2>
+  <p><strong>HNSW (Hierarchical Navigable Small World)</strong> is a graph-based indexing algorithm used for Approximate Nearest Neighbor (ANN) search in high-dimensional vector spaces. Instead of comparing a query against every vector, HNSW organizes vectors into a hierarchical graph structure that enables fast navigation to the nearest neighbors.</p>
+
+  <h2>The Building Blocks of HNSW</h2>
+  <p>HNSW combines ideas from two powerful data structures: Navigable Small World (NSW) graphs and Skip Lists.</p>
+
+  <div class="block-card">
+    <div class="block-number">Building block 01</div>
+    <h3>Navigable Small World (NSW)</h3>
+    <p>A Navigable Small World is a type of network or graph that allows for efficient navigation and search through its nodes.</p>
+
+    <h4>Structure</h4>
+    <ul>
+      <li>Nodes represent data points (e.g., vectors)</li>
+      <li>Edges represent connections between these points based on similarity</li>
+    </ul>
+
+    <h4>How NSW Search Works</h4>
+    <ul>
+      <li>Each node is connected to other similar nodes</li>
+      <li>The search starts from an entry point</li>
+      <li>The algorithm repeatedly moves to neighboring nodes that appear closer to the query</li>
+      <li>This allows efficient navigation instead of comparing the query against every vector</li>
+    </ul>
+
+    <h4>Limitation</h4>
+    <p>Pure NSW can become trapped in local optima because it relies on greedy navigation. HNSW reduces this risk by using hierarchical layers and maintaining multiple candidate paths during search.</p>
+    <div class="callout"><strong>Local optimum:</strong> A node that appears to be the best choice within its immediate neighborhood, even though a better match exists elsewhere in the graph.</div>
+  </div>
+
+  <div class="block-card">
+    <div class="block-number">Building block 02</div>
+    <h3>Skip Lists</h3>
+    <p>A Skip List is a data structure that allows fast search, insertion, and deletion operations. It is essentially a multi-level linked list where each level allows "skipping" over multiple elements, reducing the time complexity of operations.</p>
+
+    <h4>How Skip Lists Work</h4>
+    <ul>
+      <li>Data is organized into multiple levels</li>
+      <li>Higher levels contain fewer elements and act as shortcuts</li>
+      <li>Instead of traversing everything step by step, the search can use these shortcuts to quickly reach the correct region</li>
+      <li>Once near the target, the search switches to lower, more detailed levels</li>
+    </ul>
+  </div>
+
+  <h2>How HNSW Combines Both Ideas</h2>
+  <p>HNSW merges these two concepts into a single structure:</p>
+  <ul>
+    <li>Uses the graph-based navigation of NSW to move between similar vectors</li>
+    <li>Uses hierarchical layers inspired by Skip Lists to avoid getting trapped in poor search paths</li>
+    <li>Higher layers provide a coarse overview of the dataset and help quickly locate the most promising region</li>
+    <li>Lower layers contain denser connections that enable precise nearest-neighbor search</li>
+  </ul>
+
+  <hr class="section-break">
+
+  <h2>How Search Works in HNSW</h2>
+  <p>The search process follows a top-down approach. Instead of starting with the full graph, the algorithm begins at the highest layer and gradually moves toward lower layers, refining its search at each step.</p>
+
+  <div class="layer-grid">
+    <div class="layer-card">
+      <div class="layer-label">Layer 2 · Coarsest</div>
+      <h3>Finding the Right Region</h3>
+      <p>The search starts at the topmost layer, which contains only a small subset of all vectors. Because there are very few nodes and connections, this layer provides a coarse overview of the dataset.</p>
+      <h4>What happens here</h4>
+      <ul>
+        <li>Start from the entry point</li>
+        <li>Compare the query vector with the current node and its neighbors</li>
+        <li>Move to a neighboring node if it is closer to the query</li>
+        <li>Repeat until no neighboring node is closer than the current node</li>
+      </ul>
+      <p style="margin-top:0.9rem; margin-bottom:0; font-size:0.92rem; color:var(--ink-muted)">The closest node found here becomes the entry point for Layer 1.</p>
+    </div>
+
+    <div class="layer-card">
+      <div class="layer-label">Layer 1 · Intermediate</div>
+      <h3>Refining the Search</h3>
+      <p>Layer 1 contains more nodes and connections than Layer 2, providing a more detailed view of the dataset.</p>
+      <h4>What happens here</h4>
+      <ul>
+        <li>Begin from the entry point passed down from Layer 2</li>
+        <li>Continue the greedy search process</li>
+        <li>Move to neighboring nodes whenever a closer one is found</li>
+      </ul>
+      <p style="margin-top:0.9rem; margin-bottom:0; font-size:0.92rem; color:var(--ink-muted)">The closest node found here becomes the entry point for Layer 0.</p>
+    </div>
+
+    <div class="layer-card">
+      <div class="layer-label">Layer 0 · Finest</div>
+      <h3>Fine-Grained Search</h3>
+      <p>Layer 0 is the bottom layer and contains every vector in the dataset. It has the highest number of nodes and connections, making it the most detailed representation of the data.</p>
+      <h4>What happens here</h4>
+      <ul>
+        <li>Start from the entry point received from Layer 1</li>
+        <li>Explore nearby nodes within the most promising region</li>
+        <li>Continue moving toward vectors that are increasingly similar to the query</li>
+      </ul>
+      <p style="margin-top:0.9rem; margin-bottom:0; font-size:0.92rem; color:var(--ink-muted)">The algorithm reaches the nearest neighbor (or top-k nearest neighbors) — these are the final results.</p>
+    </div>
+  </div>
+
+  <div class="callout">At lower layers, HNSW keeps multiple promising candidates instead of following only one path. This broader exploration improves recall and helps avoid missing good neighbors.</div>
+
+  <hr class="section-break">
+
+  <h2>How Vectors Are Inserted into HNSW</h2>
+  <p>Understanding how vectors are inserted is just as important as understanding how search works. The quality of the graph built during insertion directly determines how accurate and fast your searches will be later.</p>
+
+  <h3>Step 1: Assigning a Maximum Layer</h3>
+  <p>When a new vector arrives, HNSW first decides how high up in the hierarchy it will live. This is done by randomly drawing a maximum layer number using an exponential probability distribution. The result:</p>
+  <ul>
+    <li>Most vectors are assigned only to Layer 0</li>
+    <li>Fewer vectors reach Layer 1</li>
+    <li>Very few vectors reach Layer 2 or higher</li>
+  </ul>
+  <p>This randomness is intentional — it's what naturally keeps upper layers sparse and lower layers dense, maintaining the hierarchical structure that makes HNSW fast.</p>
+
+  <h3>Step 2: Finding the Entry Point (Top Layers)</h3>
+  <p>Starting from the topmost layer of the graph, HNSW runs a greedy search — identical to the query search described earlier — moving toward nodes closest to the new vector. This phase has one goal: find the best entry point for the layer where insertion will actually happen. At each layer above the vector's assigned maximum, HNSW tracks only the single closest node and passes it down. No connections are formed yet.</p>
+
+  <h3>Step 3: Selecting Neighbors (Insertion Layers)</h3>
+  <p>Once HNSW reaches the vector's assigned maximum layer, the process changes. Instead of tracking just one candidate, it now tracks up to <code>ef_construct</code> candidates simultaneously. From these, HNSW selects the best <code>m</code> neighbors and creates bidirectional edges. This same process repeats going down through each layer until Layer 0.</p>
+  <p>This is the moment where the parameters you configure actually matter:</p>
+  <ul>
+    <li><code>ef_construct</code> controls how many candidates are evaluated when choosing neighbors. A higher value means more options are considered, leading to better neighbor selections and a higher quality graph.</li>
+    <li><code>m</code> controls how many of those candidates actually become permanent connections. More connections means more paths available during future searches.</li>
+  </ul>
+
+  <div class="callout">
+    <strong>Why this matters:</strong> Think of insertion as the new vector earning its place in the graph. It navigates down through the layers, identifies its neighborhood, and then permanently wires itself to the best neighbors it can find. The quality of those permanent connections is what <code>ef_construct</code> controls.
+    <br><br>
+    This is also why <code>ef_construct</code> is a build-time parameter and cannot be adjusted at query time. Once the graph is built, the connections are fixed. If you build with a low <code>ef_construct</code>, you are stuck with a lower quality graph regardless of how high you set <code>hnsw_ef</code> at search time.
+  </div>
+
+  <h2>Why This Is Efficient</h2>
+  <p>The key idea is that the upper layers act like shortcuts. Instead of searching the entire graph from the beginning, HNSW quickly identifies the correct region at higher levels and then performs increasingly detailed searches as it moves downward. Think of it like finding a book in a library:</p>
+  <ul>
+    <li>Layer 2 helps you find the correct floor</li>
+    <li>Layer 1 helps you find the correct section</li>
+    <li>Layer 0 helps you locate the exact shelf and book</li>
+  </ul>
+  <p>By narrowing the search space at each layer, HNSW achieves extremely fast nearest-neighbor search while maintaining high accuracy.</p>
+
+  <hr class="section-break">
+
+  <h2>Configuring HNSW</h2>
+  <p>You can fine-tune how the HNSW graph is built to balance search speed, accuracy, memory usage, and indexing time depending on your use case. There are three key parameters: <code>m</code>, <code>hnsw_ef</code>, and <code>ef_construct</code>.</p>
+
+  <table class="param-table">
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Controls</th>
+        <th>Typical Range</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="param-name">m</span></td>
+        <td>
+          <strong>Graph connectivity.</strong> Maximum number of connections per node. Higher <code>m</code> = denser graph, better accuracy, more memory. Lower <code>m</code> = sparser graph, faster insertion, lower accuracy.
+        </td>
+        <td><span class="param-range">8 – 64</span></td>
+      </tr>
+      <tr>
+        <td><span class="param-name">ef_construct</span></td>
+        <td>
+          <strong>Build thoroughness.</strong> Candidates evaluated during insertion. Higher = more comprehensive graph, slower indexing. Lower = faster insertion, less optimal connections.
+        </td>
+        <td><span class="param-range">100 – 500</span></td>
+      </tr>
+      <tr>
+        <td><span class="param-name">hnsw_ef</span></td>
+        <td>
+          <strong>Search thoroughness.</strong> Candidates evaluated during a query. Higher = more accurate results, slower queries. Lower = faster search, potentially less accurate. Tune this at query time.
+        </td>
+        <td><span class="param-range">50 – 200+</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Why It Is Fast and Scalable</h2>
+
+  <h3>Sublinear Search Scaling</h3>
+  <p>Unlike O(N) brute force search, HNSW search grows roughly logarithmically with the number of vectors. This makes million-scale datasets searchable in milliseconds rather than minutes.</p>
+
+  <h3>Filter-Aware</h3>
+  <p>Qdrant extends HNSW with filter-aware indexing (Filterable HNSW), allowing fast searches under structured conditions. This avoids costly full scans when filtering by metadata.</p>
+
+  <h3>Large-Scale Use</h3>
+  <ul class="scale-list">
+    <li>Supports real-time updates while maintaining high recall</li>
+    <li>Fits semantic search and recommendation systems</li>
+    <li>Scales from thousands to billions of vectors</li>
+  </ul>
+
+  <div class="callout">In practice, HNSW search scales close to logarithmically with dataset size, making million-scale searches extremely fast.</div>
+
+  <p class="post-footer">HNSW is one of the key innovations that made modern vector search practical at scale. Instead of comparing a query against millions of vectors, it intelligently navigates a hierarchical graph to quickly reach the most relevant results. By combining the navigability of small-world graphs with the hierarchical shortcuts of skip lists, HNSW delivers an impressive balance of speed, accuracy, and scalability.<br><br>Whether you're building semantic search, recommendation systems, RAG applications, or large-scale AI products, chances are an HNSW graph is working behind the scenes to make those millisecond searches possible. The next time a vector database returns relevant results almost instantly, you'll know it's not magic — it's smart graph navigation.</p>
+
+</article>
+</body>
+</html>
